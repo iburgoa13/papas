@@ -36,6 +36,10 @@
             Ver lista de órdenes
           </a>
         </div>
+        <form method="post" action="{% url 'get_reporte_1' %}">
+          {% csrf_token %}
+          <button type="submit">Generar reporte</button>
+      </form>
       </div>
     </div>
   </div>

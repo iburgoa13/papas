@@ -2,9 +2,13 @@ import codecs
 import csv
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.http import HttpResponse
 from .models import Customer, Product, Order
 from django.shortcuts import get_object_or_404
 from io import TextIOWrapper
+from django.http import FileResponse
+
+from decimal import Decimal
 from math import ceil
 def import_customers(request):
     if request.method == 'POST':
@@ -69,18 +73,26 @@ def import_orders(request):
             next(reader)
         for row in reader:
             if Order.objects.filter(id=row[0]).exists():
-                messages.error(request, f"El producto con id {row[0]} ya existe")
+                messages.error(request, f"El order con id {row[0]} ya existe")
                 continue
             else:
                 customer = get_object_or_404(Customer, id=row[1])
-                order = Order.objects.create(
-                    id=int(row[0]),
-                    customer=customer
-                )
-                for product_id in row[2].split(' '):
-                    product = get_object_or_404(Product, id=product_id)
-                    order.products.add(product)
-                order.save()
+                product_ids = row[2].split(' ')
+                print(product_ids)
+                for product in product_ids:
+                    products = get_object_or_404(Product, id=product)
+
+                    # products = Product.objects.filter(id=product)
+                    # product_p = products.first()
+                    print(products)
+
+                    order, created = Order.objects.get_or_create(id_order=row[0], customer=customer, product=products)
+                    print(order)
+                    print(created)
+                    if not created:
+                        print("existe")
+                        order.amount += 1
+                        order.save()
         return redirect('order_list')  # Redirige al usuario a la lista de produtos
 
     return render(request, 'import_order.html')
@@ -99,3 +111,31 @@ def order_list(request):
 
 def home(request):
     return render(request, 'home.html')
+
+def get_reporte_1(request):
+    orders = Order.objects.all()
+    id_orders = list(Order.objects.values_list('id_order', flat=True))
+    order_totals = {}
+
+    for ids_order in id_orders:
+        total = 0
+        orders = Order.objects.filter(id_order=ids_order)
+        for order in orders:
+            print(order)
+            total += order.amount * order.product.cost
+            order_totals[order.id_order] = total
+    
+    with open('order_prices.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile, delimiter=',')
+        
+        # Escribir el encabezado del archivo
+        writer.writerow(['Order ID', 'Total (EUR)'])
+        
+        # Escribir los resultados en el archivo
+        for order_id, total in order_totals.items():
+            writer.writerow([order_id, total])
+    with open('order_prices.csv', 'r') as file:
+        response = HttpResponse(file, content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename=orders_prices.csv'
+        
+    return response
