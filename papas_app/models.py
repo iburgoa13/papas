@@ -1,7 +1,16 @@
 from django.db import models
-
+from django.core.validators import MinValueValidator
 # Create your models here.
 
-class Customers(models.Model):
-    nombre = models.CharField(max_length=100)
-    correo = models.EmailField(null=False, default="sin correo")
+class Customer(models.Model):
+    id = models.AutoField(primary_key=True)
+    first_name = models.CharField(max_length=200)
+    last_name = models.CharField(max_length=200)
+    
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
+class Product(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=200)
+    cost = models.DecimalField(max_digits=15, decimal_places=2, validators=[MinValueValidator(0.0)])

@@ -1,15 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Lista de clientes</title>
-</head>
-<body>
-    <h1>Lista de clientes</h1>
-    <ul>
-        {% for cliente in clientes %}
-            <li>{{ cliente.nombre }} - {{ cliente.correo }}</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+{% if customers %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Apellido</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for customer in customers %}
+        <tr>
+          <td>{{ customer.id }}</td>
+          <td>{{ customer.first_name }}</td>
+          <td>{{ customer.last_name }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No se encontraron clientes.</p>
+{% endif %}
