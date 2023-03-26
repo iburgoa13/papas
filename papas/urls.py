@@ -16,15 +16,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from papas_app.views import import_customers, customer_list, home, import_products, product_list
+from papas_app.views import import_customers, customer_list, home, import_products, product_list, import_orders, order_list
 
 urlpatterns = [
     # Ruta para importar clientes desde un archivo CSV
     path('', home, name='home'),
     path('import-customers/', import_customers, name='import_customers'),
     path('import-product/', import_products, name='import_products'),
+    path('import-order/', import_orders, name='import_orders'),
 
     # Ruta para mostrar la lista de clientes
     path('customer-list/', customer_list, name='customer_list'),
     path('product-list/', product_list, name='product_list'),
+    path('order-list/', order_list, name='order_list'),
 ]

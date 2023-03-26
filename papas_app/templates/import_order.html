@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Importar Órdenes</title>
+</head>
+<body>
+    <h1>Importar Órdenes desde un archivo CSV</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="csv_file">Seleccione un archivo CSV:</label>
+        <input type="file" name="csv_file" id="csv_file">
+        <br>
+        <button type="submit">Importar</button>
+    </form>
+    <a href="{% url 'order_list' %}" class="btn btn-primary">Ver Órdenes</a>
+</body>
+</html>
