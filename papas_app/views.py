@@ -5,6 +5,8 @@ from django.contrib import messages
 from django.http import HttpResponse
 from .models import Customer, Product, Order
 from django.shortcuts import get_object_or_404
+from django.db.models import Sum, Value
+from django.db.models.functions import Coalesce
 from io import TextIOWrapper
 from django.http import FileResponse
 
@@ -111,6 +113,42 @@ def order_list(request):
 
 def home(request):
     return render(request, 'home.html')
+
+def get_reporte_3(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="customer_ranking.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['id', 'name', 'lastname', 'total'])
+
+    customers = Customer.objects.annotate(
+        total=Coalesce(
+            Sum('order__amount', field='order__amount * order__product__cost'), 
+            Value(0)
+        )
+    ).order_by('-total')
+
+    for customer in customers:
+        writer.writerow([customer.id, customer.first_name, customer.last_name, customer.total])
+
+    return response   
+
+def get_reporte_2(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="product_customers.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['id', 'customer_ids'])
+
+    products = Product.objects.all()
+
+    for product in products:
+        orders = Order.objects.filter(product=product)
+        customer_ids = sorted(set(order.customer_id for order in orders))
+        customers = ' '.join(str(customer_id) for customer_id in customer_ids)
+        writer.writerow([product.id, customers])
+
+    return response
 
 def get_reporte_1(request):
     orders = Order.objects.all()

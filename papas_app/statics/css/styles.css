@@ -1,6 +1,10 @@
 .card {
     max-width: 700px;
   }
+  .container {
+    max-width: 600px; /* ajusta el ancho máximo según tus necesidades */
+    margin: 0 auto;
+  }
   
   .card-header {
     background-color: #0069d9;
