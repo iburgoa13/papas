@@ -16,3 +16,10 @@
     <a href="{% url 'customer_list' %}" class="btn btn-primary">Ver Clientes</a>
 </body>
 </html>
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-danger" role="alert">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}

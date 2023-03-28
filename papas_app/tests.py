@@ -1,34 +1,58 @@
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, Client
+from django.test import TestCase
 from django.urls import reverse
-from papas_app.models import Customer
-
-class ImportCustomersTestCase(TestCase):
+from .models import Customer, Product
+class CustomerListTestCase(TestCase):
+    
     def setUp(self):
-        self.client = Client()
-        self.import_customers_url = reverse('import_customers')
-
-    def test_import_customers_view_get(self):
-        response = self.client.get(self.import_customers_url)
-        self.assertEqual(response.status_code, 302)
-        self.assertTemplateUsed(response, 'import_customers.html')
-
-    def test_import_customers_view_post_wrong_file(self):
-        csv_file = SimpleUploadedFile("file.txt", b"file_content", content_type="text/plain")
-        response = self.client.post(self.import_customers_url, {'csv_file': csv_file})
-        self.assertContains(response, 'El archivo seleccionado no es un archivo CSV.')
-
-    def test_import_customers_view_post_success(self):
-        csv_file = SimpleUploadedFile("file.csv", b"id,first_name,last_name\n1,John,Doe\n2,Jane,Doe\n", content_type="text/csv")
-        response = self.client.post(self.import_customers_url, {'csv_file': csv_file})
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('customer_list'))
-        self.assertEqual(len(Customer.objects.all()), 2)
-
-    def test_import_customers_view_post_error(self):
-        Customer.objects.create(id=1, first_name='John', last_name='Doe')
-        csv_file = SimpleUploadedFile("file.csv", b"id,first_name,last_name\n1,John,Doe\n2,Jane,Doe\n", content_type="text/csv")
-        response = self.client.post(self.import_customers_url, {'csv_file': csv_file})
+        self.customer1 = Customer.objects.create(
+            id=1,
+            first_name='John',
+            last_name='Doe',
+        )
+        self.customer2 = Customer.objects.create(
+            id=2,
+            first_name='Jane',
+            last_name='Doe',
+        )
+    
+    def test_customer_list_view(self):
+        # Obtener la URL de la vista
+        url = reverse('customer_list')
+        
+        # Realizar una petición GET a la URL
+        response = self.client.get(url)
+        
+        # Verificar que la respuesta tiene un status code de 200
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'El cliente con id 1 ya existe')
-        self.assertEqual(len(Customer.objects.all()), 1)
+        
+        # Verificar que se están mostrando todos los clientes en la respuesta
+        self.assertContains(response, self.customer1.first_name)
+        self.assertContains(response, self.customer1.last_name)
+        self.assertContains(response, self.customer2.first_name)
+        self.assertContains(response, self.customer2.last_name)
+        
+        # Verificar que se está utilizando la plantilla correcta
+        self.assertTemplateUsed(response, 'customer_list.html')
+
+class ProductListTest(TestCase):
+    
+    def setUp(self):
+        # Creamos algunos productos para usar en los tests
+        self.product1 = Product.objects.create(id=1,name='Producto 1', cost=10.0)
+        self.product2 = Product.objects.create(id=2,name='Producto 2', cost=20.0)
+    
+    def test_product_list_view(self):
+        # Hacemos una petición GET a la vista product_list
+        response = self.client.get(reverse('product_list'))
+        
+        # Verificamos que la respuesta tiene un código HTTP 200 OK
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificamos que la plantilla usada es la correcta
+        self.assertTemplateUsed(response, 'product_list.html')
+        
+        # Verificamos que se muestran todos los productos en la base de datos
+        products = response.context['products']
+        self.assertEqual(len(products), 2)
+        self.assertIn(self.product1, products)
+        self.assertIn(self.product2, products)
