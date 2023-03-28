@@ -1,6 +1,8 @@
 name: Django Tests
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 
@@ -11,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2.2.2
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
           python-version: 3.9
 
@@ -21,7 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements_env.txt
 
-      - name: Run tests with coverage
+      - name: Run tests
         run: |
-          coverage run --source='.' manage.py test
-          coverage report -m
+          python manage.py test
+          test_exit_code=$?
+          echo "::set-output name=test_exit_code::$test_exit_code"
+
+      - name: Fail if tests fail
+        if: ${{ steps.test.outputs.test_exit_code != 0 }}
+        run: exit 1

@@ -56,3 +56,7 @@ class ProductListTest(TestCase):
         self.assertEqual(len(products), 2)
         self.assertIn(self.product1, products)
         self.assertIn(self.product2, products)
+
+class TestFail(TestCase):
+    def test(self):
+        self.assertEqual(1,2)
