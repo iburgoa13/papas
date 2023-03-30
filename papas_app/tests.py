@@ -1,10 +1,12 @@
 from django.test import TestCase
 from django.urls import reverse
-from .models import Customer, Product
+from .models import Customer, Product, Order
 from io import StringIO
-from .views import validate_csv_file,validate_csv_header, import_customer_row
+from .views import validate_csv_file,validate_csv_header, import_customer_row, import_product_row,import_order_row
 from unittest.mock import patch, Mock, call
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.contrib.messages import get_messages
+from django.test import RequestFactory
 class CustomerListTestCase(TestCase):
     
     def setUp(self):
@@ -80,16 +82,17 @@ class ImportCustomerTest(TestCase):
     
     def test_validate_csv_header(self):
     # Test case 1: encabezado del archivo CSV es correcto
-        header = ['id', 'firstname', 'lastname']
+        good_header = ['id', 'firstname', 'lastname']
+        expected_header = ['id', 'firstname', 'lastname']
         try:
-            validate_csv_header(header)
+            validate_csv_header(good_header,expected_header)
         except Exception:
             assert False, "Debería haber pasado la validación, ya que el encabezado es correcto."
 
         # Test case 2: encabezado del archivo CSV no es correcto
         header = ['id', 'first_name', 'last_name']
         try:
-            validate_csv_header(header)
+            validate_csv_header(header,good_header)
         except Exception as e:
             self.assertEqual(str(e),"El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'firstname' y 'lastname', y en ese orden.")
             pass
@@ -121,3 +124,21 @@ class ImportCustomerTest(TestCase):
                     assert False, "Error al importar el cliente."
                 except Exception as e:
                     pass
+
+class ImportProductTest(TestCase):
+    def test_import_customer_row(self):
+    # Test case 1: importar una fila de producto correcto
+        row = ['1', 'mesa', 12.49]
+        with patch.object(Product.objects, 'filter', return_value=Product.objects.none()):
+            with patch.object(Product.objects, 'create', return_value=Mock(spec=Product)) as mock_product_create:
+                import_product_row(row)
+                mock_product_create.assert_called_once_with(id=1, name='mesa', cost=12.49)
+
+        # Test case 2: Producto con id ya existente en la base de datos
+        row = ['1', 'silla', 1.20]
+        with patch.object(Product.objects, 'filter', return_value=Product.objects.all()):
+            try:
+                import_product_row(row)
+                assert False, "Aquí el producto ya existe en bbdd"
+            except Exception as e:
+                pass

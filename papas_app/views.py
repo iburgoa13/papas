@@ -15,11 +15,10 @@ def validate_csv_file(csv_file):
     if not csv_file.name.endswith('.csv'):
         raise Exception('El archivo seleccionado no es un archivo CSV.')
 
-def validate_csv_header(header):
+def validate_csv_header(header, expected_header):
     """
     Valida si el encabezado del CSV es correcto.
     """
-    expected_header = ['id', 'firstname', 'lastname']
     if header != expected_header:
         raise Exception(f"El archivo CSV debe tener exactamente tres columnas con los nombres de columna '{expected_header[0]}', '{expected_header[1]}' y '{expected_header[2]}', y en ese orden.")
 
@@ -61,7 +60,7 @@ def import_customers(request):
             validate_csv_file(csv_file)
             reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
             header = next(reader)
-            validate_csv_header(header)
+            validate_csv_header(header,['id', 'firstname', 'lastname'])
             import_customers_from_csv(request, reader)
             return redirect('customer_list')    
         except Exception as e:
@@ -70,84 +69,90 @@ def import_customers(request):
 
     return render(request, 'import_customers.html')
 
-def import_products(request):
+def import_product_row(row):
+    """
+    Crea un objeto Product en la base de datos a partir de una fila del CSV.
+    """
     try:
-        if request.method == 'POST':
-            try:
-                csv_file = request.FILES['csv_file']
-                if not csv_file.name.endswith('.csv'):
-                    messages.error(request, 'El archivo seleccionado no es un archivo CSV.')
-                else:
-                    try:
-                        reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
-                        header = next(reader)
-                        if header != ['id', 'name', 'cost']:
-                            print("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'name' y 'cost', y en ese orden.")
-                            raise Exception("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'name' y 'cost', y en ese orden.")
-
-                        for row in reader:
-                            try:
-                                if Product.objects.filter(id=row[0]).exists():
-                                    messages.error(request, f"El producto con id {row[0]} ya existe")
-                                    continue
-                                else:
-                                    product = Product.objects.create(
-                                        id=int(row[0]),
-                                        name=row[1],
-                                        cost=ceil(float(row[2]) * 100) / 100
-                                    )
-                                    product.save()
-                            except Exception as e:
-                                messages.error(request, f"Error al importar el producto con id {row[0]}: {e}")
-                                continue
-                        return redirect('product_list')  # Redirige al usuario a la lista de productos
-                    except Exception as e:
-                        messages.error(request, f"Error al procesar el archivo CSV: {e}")
-                        return redirect('import_products')
-            except Exception as e:
-                messages.error(request, f"Error al cargar el archivo CSV: {e}")
-                return redirect('import_products')
-        return render(request, 'import_products.html')
+        if Product.objects.filter(id=row[0]).exists():
+            messages.error(f"El producto con id {row[0]} ya existe")
+        else:
+            product = Product.objects.create(
+                id=int(row[0]),
+                name=row[1],
+                cost=ceil(float(row[2]) * 100) / 100
+            )
+            product.save()
     except Exception as e:
-        messages.error(request, f"Error en la solicitud: {e}")
-        return redirect('import_products')
+        messages.error(f"Error al importar el producto con id {row[0]}: {e}")
+
+def import_products_from_csv(request,reader):
+    """
+    Importa los productos de un archivo CSV subido por el usuario.
+    """
+    for row in reader:
+        try:
+            import_product_row(row)
+        except Exception as e:
+            messages.error(request, str(e))
+            continue
+
+def import_products(request):
+    if request.method == 'POST':
+        try:
+            csv_file = request.FILES['csv_file']
+            validate_csv_file(csv_file)
+            reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
+            header = next(reader)
+            validate_csv_header(header,['id', 'name', 'cost'])
+            import_products_from_csv(request,reader)
+            return redirect('product_list')
+        except Exception as e:
+            messages.error(request, f"Error al procesar el archivo CSV: {e}")
+            return redirect('import_products')
+    return render(request, 'import_products.html')
+
+def import_order_row(row):
+    try:
+        customer = get_object_or_404(Customer, id=row[1])
+        product_ids = row[2].split(' ')
+        print(product_ids)
+        for product in product_ids:
+            products = get_object_or_404(Product, id=product)
+            order, created = Order.objects.get_or_create(id_order=row[0], customer=customer, product=products)
+            if not created:
+                order.amount += 1
+                order.save()
+    except Exception as e:
+        messages.error(f"Error al importar la orden con id {row[0]}: {e}")
+
+
+def import_orders_from_csv(request,reader):
+    """
+    Importa los orders de un archivo CSV subido por el usuario.
+    """
+    for row in reader:
+        try:
+            import_order_row(row)
+        except Exception as e:
+            messages.error(request, str(e))
+            continue
 
 def import_orders(request):
-    try:
-        if request.method == 'POST':
-            try:
-                csv_file = request.FILES['csv_file']
-                if not csv_file.name.endswith('.csv'):
-                    messages.error(request, 'El archivo seleccionado no es un archivo CSV.')
-                else:            
-                    reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
-                    header = next(reader)
-                    if header != ['id', 'customer', 'products']:
-                        print("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'customer' y 'products', y en ese orden.")
-                        raise Exception("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'customer' y 'products', y en ese orden.")
-                    
-                    for row in reader:
-                        try:
-                            customer = get_object_or_404(Customer, id=row[1])
-                            product_ids = row[2].split(' ')
-                            print(product_ids)
-                            for product in product_ids:
-                                products = get_object_or_404(Product, id=product)
-                                order, created = Order.objects.get_or_create(id_order=row[0], customer=customer, product=products)
-                                if not created:
-                                    order.amount += 1
-                                    order.save()
-                        except Exception as e:
-                            messages.error(request, f"Error al importar la orden con id {row[0]}: {e}")
-                            continue
-                return redirect('order_list')
-            except Exception as e:
-                messages.error(request, f"Error al procesar el archivo CSV: {e}")
-                return redirect('import_order')
-    except Exception as e:
-        messages.error(request, f"Ocurrió un error inesperado: {e}")
-        return redirect('order_list')
+    if request.method == 'POST':
+        try:
+            csv_file = request.FILES['csv_file']
+            validate_csv_file(csv_file)
+            reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
+            header = next(reader)
+            validate_csv_header(header,['id', 'customer', 'products'])
+            import_orders_from_csv(request,reader)
+            return redirect('order_list')
+        except Exception as e:
+            messages.error(request, f"Error al procesar el archivo CSV: {e}")
+            return redirect('import_order')
     return render(request, 'import_order.html')
+
 
 def customer_list(request):
     customers = Customer.objects.all()
