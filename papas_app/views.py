@@ -8,34 +8,61 @@ from django.http import HttpResponse
 from .models import Customer, Product, Order
 from math import ceil
 
+def validate_csv_file(csv_file):
+    """
+    Valida si el archivo subido por el usuario es un CSV.
+    """
+    if not csv_file.name.endswith('.csv'):
+        raise Exception('El archivo seleccionado no es un archivo CSV.')
+
+def validate_csv_header(header):
+    """
+    Valida si el encabezado del CSV es correcto.
+    """
+    expected_header = ['id', 'firstname', 'lastname']
+    if header != expected_header:
+        raise Exception(f"El archivo CSV debe tener exactamente tres columnas con los nombres de columna '{expected_header[0]}', '{expected_header[1]}' y '{expected_header[2]}', y en ese orden.")
+
+def import_customer_row(row):
+    """
+    Crea un objeto Customer en la base de datos a partir de una fila del CSV.
+    """
+    try:
+        if Customer.objects.filter(id=row[0]).exists():
+            raise Exception(f"El cliente con id {row[0]} ya existe.")
+        else:
+            customer = Customer.objects.create(
+                id=int(row[0]),
+                first_name=row[1],
+                last_name=row[2]
+            )
+            customer.save()
+    except Exception as e:
+        raise Exception(f"Error al importar el cliente con id {row[0]}: {e}")
+
+def import_customers_from_csv(request, reader):
+    """
+    Importa los clientes de un archivo CSV subido por el usuario.
+    """
+    for row in reader:
+        try:
+            import_customer_row(row)
+        except Exception as e:
+            messages.error(request, str(e))
+            continue
+
 def import_customers(request):
+    """
+    Vista para importar clientes desde un archivo CSV subido por el usuario.
+    """
     if request.method == 'POST':
         try:
             csv_file = request.FILES['csv_file']
-            if not csv_file.name.endswith('.csv'):
-                messages.error(request, 'El archivo seleccionado no es un archivo CSV.')
-            else:
-                reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
-                header = next(reader)
-                if header != ['id', 'firstname', 'lastname']:
-                    print("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'firstname' y 'lastname', y en ese orden.")
-                    raise Exception("El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'firstname' y 'lastname', y en ese orden.")
-            for row in reader:
-                try:
-                    if Customer.objects.filter(id=row[0]).exists():
-                        messages.error(request, f"El cliente con id {row[0]} ya existe")
-                        print(f"El cliente con id {row[0]} ya existe")
-                        continue
-                    else:
-                        customer = Customer.objects.create(
-                            id=int(row[0]),
-                            first_name=row[1],
-                            last_name=row[2]
-                        )
-                        customer.save()
-                except Exception as e:
-                    messages.error(request, f"Error al importar el cliente con id {row[0]}: {e}")
-                    continue
+            validate_csv_file(csv_file)
+            reader = csv.reader(codecs.iterdecode(csv_file, 'utf-8'))
+            header = next(reader)
+            validate_csv_header(header)
+            import_customers_from_csv(request, reader)
             return redirect('customer_list')    
         except Exception as e:
             messages.error(request, f"Error al procesar el archivo CSV: {e}")

@@ -1,6 +1,10 @@
 from django.test import TestCase
 from django.urls import reverse
 from .models import Customer, Product
+from io import StringIO
+from .views import validate_csv_file,validate_csv_header, import_customer_row
+from unittest.mock import patch, Mock, call
+from django.core.files.uploadedfile import SimpleUploadedFile
 class CustomerListTestCase(TestCase):
     
     def setUp(self):
@@ -56,3 +60,64 @@ class ProductListTest(TestCase):
         self.assertEqual(len(products), 2)
         self.assertIn(self.product1, products)
         self.assertIn(self.product2, products)
+
+class ImportCustomerTest(TestCase):
+    
+    def test_validate_csv_file(self):
+        # Test case 1: archivo CSV subido correctamente
+        csv_file = SimpleUploadedFile("file.csv", b"file_content", content_type="text/csv")
+        try:
+            validate_csv_file(csv_file)
+        except Exception:
+            assert False, "Debería haber pasado la validación, ya que es un archivo CSV."
+        
+        # Test case 2: archivo no CSV subido
+        txt_file = SimpleUploadedFile("file.txt", b"file_content", content_type="text/plain")
+        try:
+            validate_csv_file(txt_file)
+        except Exception as e:
+            self.assertEqual(str(e),"El archivo seleccionado no es un archivo CSV.")
+    
+    def test_validate_csv_header(self):
+    # Test case 1: encabezado del archivo CSV es correcto
+        header = ['id', 'firstname', 'lastname']
+        try:
+            validate_csv_header(header)
+        except Exception:
+            assert False, "Debería haber pasado la validación, ya que el encabezado es correcto."
+
+        # Test case 2: encabezado del archivo CSV no es correcto
+        header = ['id', 'first_name', 'last_name']
+        try:
+            validate_csv_header(header)
+        except Exception as e:
+            self.assertEqual(str(e),"El archivo CSV debe tener exactamente tres columnas con los nombres de columna 'id', 'firstname' y 'lastname', y en ese orden.")
+            pass
+    
+    def test_import_customer_row(self):
+        # Test case 1: importar una fila de cliente correcta
+        row = ['123', 'John', 'Doe']
+        with patch.object(Customer.objects, 'filter', return_value=Customer.objects.none()):
+            with patch.object(Customer.objects, 'create', return_value=Mock(spec=Customer)) as mock_customer_create:
+                import_customer_row(row)
+                mock_customer_create.assert_called_once_with(id=123, first_name='John', last_name='Doe')
+
+        # Test case 2: cliente con id ya existente en la base de datos
+        row = ['123', 'Jane', 'Doe']
+        with patch.object(Customer.objects, 'filter', return_value=Customer.objects.all()):
+            try:
+                import_customer_row(row)
+                assert False, "Aquí el cliente ya existe en bbdd"
+            except Exception as e:
+                pass
+                
+
+        # Test case 3: error al importar el cliente
+        row = ['123', 'Jane', 'Doe']
+        with patch.object(Customer.objects, 'filter', return_value=Customer.objects.none()):
+            with patch.object(Customer.objects, 'create', side_effect=Exception("Error al crear el objeto")):
+                try:
+                    import_customer_row(row)
+                    assert False, "Error al importar el cliente."
+                except Exception as e:
+                    pass
